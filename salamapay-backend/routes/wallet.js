@@ -3,12 +3,12 @@ const router = express.Router();
 const Wallet = require('../models/wallet');
 
 // create wallet
-router.post('/', async (req, res) => {
-  const { phone } = req.body;
-  if (!phone) return res.status(400).json({error:'phone required'});
-  const w = new Wallet({ phone });
-  await w.save();
-  res.json(w);
+router.post('/deposit', async (req, res) => {
+  const { phone, amount } = req.body;
+  if (!phone || !amount) {
+    return res.status(400).json({ error: 'phone and amount required' });
+  }
+  // ... proceed to create/update wallet
 });
 
 // get wallet
