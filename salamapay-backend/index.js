@@ -19,6 +19,14 @@ app.use('/api/auth', authRoutes);
 
 const PORT = process.env.PORT || 10000;
 
+// Health check route
+app.get('/api/status', (req, res) => {
+  res.json({
+    success: true,
+    message: '✅ SalamaPay backend is live and healthy!'
+  });
+});
+
 async function start() {
   try {
     const uri = process.env.MONGO_URI;
