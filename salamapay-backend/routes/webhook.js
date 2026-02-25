@@ -1,24 +1,59 @@
 const express = require('express');
-const router = express.Router();
 const Wallet = require('../models/wallet');
 const Transaction = require('../models/transaction');
 
-// Jenga webhook simulation: credits wallet when deposit arrives
-router.post('/jenga', async (req, res) => {
-  const { transactionId, amount, status, reference, msisdn } = req.body;
-  // Normally verify signature here
-  if (status === 'SUCCESS') {
-    const phone = msisdn; // expecting 2547.... format
-    let w = await Wallet.findOne({ phone });
-    if (!w) {
-      w = new Wallet({ phone, balance: amount });
-    } else {
-      w.balance += Number(amount);
-    }
-    await w.save();
-    console.log(`Credited ${amount} to ${phone} for ref ${reference}`);
+const router = express.Router();
+
+async function handleCredit(msisdn, amount, reference, channel) {
+  const numericAmount = Number(amount);
+  if (!msisdn || !numericAmount || numericAmount <= 0) {
+    return;
   }
-  res.status(200).send('ACK');
+
+  let wallet = await Wallet.findOne({ phone: msisdn });
+  if (!wallet) {
+    wallet = await Wallet.create({ phone: msisdn, balance: numericAmount });
+  } else {
+    wallet.balance += numericAmount;
+    await wallet.save();
+  }
+
+  await Transaction.create({
+    phone: msisdn,
+    type: 'deposit',
+    amount: numericAmount,
+    status: 'success',
+    reference,
+    metadata: { source: channel }
+  });
+}
+
+router.post('/mpesa', async (req, res) => {
+  try {
+    const { amount, status, reference, msisdn } = req.body;
+
+    if (status === 'SUCCESS') {
+      await handleCredit(msisdn, amount, reference, 'mpesa');
+    }
+
+    return res.status(200).json({ ack: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Webhook processing failed', details: err.message });
+  }
+});
+
+router.post('/jenga', async (req, res) => {
+  try {
+    const { amount, status, reference, msisdn } = req.body;
+
+    if (status === 'SUCCESS') {
+      await handleCredit(msisdn, amount, reference, 'jenga');
+    }
+
+    return res.status(200).json({ ack: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Webhook processing failed', details: err.message });
+  }
 });
 
 module.exports = router;

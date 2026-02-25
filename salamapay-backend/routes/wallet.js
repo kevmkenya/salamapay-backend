@@ -1,45 +1,106 @@
 const express = require('express');
-const router = express.Router();
 const Wallet = require('../models/wallet');
+const Transaction = require('../models/transaction');
+const { withdrawalFee } = require('../utils/fees');
 
-// 💰 Deposit to Wallet (Create if not exists)
+const router = express.Router();
+
+async function getOrCreateWallet(phone) {
+  let wallet = await Wallet.findOne({ phone });
+  if (!wallet) {
+    wallet = await Wallet.create({ phone });
+  }
+  return wallet;
+}
+
 router.post('/deposit', async (req, res) => {
   try {
-    const { phone, amount } = req.body;
-    if (!phone || !amount) {
-      return res.status(400).json({ error: 'phone and amount required' });
+    const { phone, amount, reference } = req.body;
+    const numericAmount = Number(amount);
+
+    if (!phone || !numericAmount || numericAmount <= 0) {
+      return res.status(400).json({ error: 'phone and positive amount are required' });
     }
 
-    // check if wallet exists
-    let wallet = await Wallet.findOne({ phone });
-    if (!wallet) {
-      wallet = new Wallet({ phone, balance: 0 });
-    }
-
-    wallet.balance += Number(amount);
+    const wallet = await getOrCreateWallet(phone);
+    wallet.balance += numericAmount;
     await wallet.save();
 
-    res.json({
+    await Transaction.create({
+      phone,
+      type: 'deposit',
+      amount: numericAmount,
+      reference,
+      metadata: { source: 'manual_or_webhook' }
+    });
+
+    return res.json({
       success: true,
-      message: `Deposited KES ${amount} successfully.`,
-      balance: wallet.balance
+      message: `Deposited KES ${numericAmount} successfully.`,
+      wallet
     });
   } catch (err) {
-    res.status(500).json({ error: 'Server error', details: err.message });
+    return res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
-// 📲 Get wallet by phone
-router.get('/:phone', async (req, res) => {
+router.post('/withdraw', async (req, res) => {
   try {
-    const phone = req.params.phone;
+    const { phone, amount, reference } = req.body;
+    const numericAmount = Number(amount);
+
+    if (!phone || !numericAmount || numericAmount <= 0) {
+      return res.status(400).json({ error: 'phone and positive amount are required' });
+    }
+
     const wallet = await Wallet.findOne({ phone });
     if (!wallet) {
       return res.status(404).json({ error: 'wallet not found' });
     }
-    res.json(wallet);
+
+    const fee = withdrawalFee(numericAmount);
+    const totalDebit = numericAmount + fee;
+
+    if (wallet.balance < totalDebit) {
+      return res.status(400).json({
+        error: 'insufficient funds',
+        required: totalDebit,
+        available: wallet.balance
+      });
+    }
+
+    wallet.balance -= totalDebit;
+    await wallet.save();
+
+    await Transaction.create({
+      phone,
+      type: 'withdrawal',
+      amount: numericAmount,
+      reference,
+      metadata: { fee, totalDebit }
+    });
+
+    return res.json({
+      success: true,
+      message: `Withdrew KES ${numericAmount} (fee KES ${fee}).`,
+      fee,
+      wallet
+    });
   } catch (err) {
-    res.status(500).json({ error: 'Server error', details: err.message });
+    return res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
+router.get('/:phone', async (req, res) => {
+  try {
+    const wallet = await Wallet.findOne({ phone: req.params.phone });
+    if (!wallet) {
+      return res.status(404).json({ error: 'wallet not found' });
+    }
+
+    return res.json(wallet);
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
