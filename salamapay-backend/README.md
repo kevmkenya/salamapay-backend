@@ -1,23 +1,39 @@
-# SalamaPay Backend Starter (Sandbox-ready)
+# SalamaPay Backend (MVP)
 
-## Overview
-Minimal Node.js/Express starter backend for SalamaPay.
-Includes:
-- Wallet and escrow routes (skeleton)
-- Jenga (Equity) sandbox helpers (placeholder)
-- Webhook endpoint for Jenga callbacks
-- Firebase Admin skeleton for OTP/auth (optional)
+Node.js + Express + MongoDB backend for the SalamaPay wallet and escrow MVP.
 
-## Quick start (local)
-1. Copy `.env.example` to `.env` and fill in values (MONGO_URI, Jenga keys, Firebase keys if used).
-2. `npm install`
-3. `node index.js`
-4. Visit `http://localhost:10000/api/health` to confirm.
+## Features
+- Firebase-auth verification endpoint with backend JWT issuance.
+- Wallet APIs: deposit, withdraw, fetch wallet.
+- Escrow APIs: create (fund), release, cancel, list.
+- M-Pesa STK trigger endpoint (simulation stub for integration).
+- Webhook handlers for M-Pesa/Jenga deposit callbacks.
+- Transaction history endpoint.
 
-## Deploy to Render
-- Push this repo to GitHub.
-- Create a new Web Service on Render, connect the repo, set environment variables in Render dashboard, and deploy.
-- Configure Jenga webhook to point to `https://<render-url>/api/webhook/jenga` for deposit notifications.
+## Quick start
+1. Copy environment template:
+   - `cp .env.example .env`
+2. Install dependencies:
+   - `npm install`
+3. Start the backend:
+   - `npm start`
+4. Health check:
+   - `GET http://localhost:10000/api/health`
+
+## API routes
+- `POST /api/auth/verify`
+- `POST /api/wallet/deposit`
+- `POST /api/wallet/withdraw`
+- `GET /api/wallet/:phone`
+- `POST /api/escrow`
+- `POST /api/escrow/release`
+- `POST /api/escrow/cancel`
+- `GET /api/escrow/:phone`
+- `GET /api/history/:phone`
+- `POST /api/mpesa/stk`
+- `POST /api/webhook/mpesa`
+- `POST /api/webhook/jenga`
 
 ## Notes
-This is a starter template meant for sandbox/testing. Secure secrets and add production-grade security before going live.
+- The M-Pesa STK endpoint is a simulation stub for MVP scaffolding.
+- Replace `JWT_SECRET` and wire in real Firebase token verification before production.
